@@ -3,6 +3,14 @@
 <head>
 <title>Hello World 2D</title>
 <meta charset="UTF-8"/>
+
+<!-- 
+    Demo: 
+    Use "requestAnimationFrame" and "cancelAnimationFrame" to create/pause a gameloop.
+    Move the camera matrix logic to the gameloop
+
+-->
+
 <script src="../../build/app.js"></script>
 
 <script>
@@ -11,9 +19,14 @@ const [SCREEN_WIDTH, SCREEN_HEIGHT] = [640, 480];
 const {glMatrix, jQuery:$} = app.libs;
 const {mat4, vec3} = glMatrix;
 
-const {Renderer, Constants} = app.modules;
-const {vert_coords, text_coords, face_indices} = Constants; //NEW: Load texture coordinates
+const {Renderer, AsyncTask, Constants} = app.modules; //NEW: added AsyncTask
+const {vert_coords, text_coords, face_indices} = Constants; 
 const {serverUrl} = app.params;
+
+//NEW: define common globals
+let shaderProgram = null;
+let renderer = null;
+let theta = 0;
 
 function initGL(gl) {
     gl.enable(gl.BLEND);
@@ -24,36 +37,7 @@ function initGL(gl) {
 let vertexShaderResponse = $.ajax({ url: `${serverUrl}/shaders/simple-texture.vert`});
 let fragmentShaderResponse = $.ajax({ url: `${serverUrl}/shaders/simple-texture.frag`});
 
-window.onload = async () => {
-
-    await vertexShaderResponse;
-    await fragmentShaderResponse;
-
-    let canvas = document.getElementById('screen_canvas');
-    canvas.width  = SCREEN_WIDTH;
-    canvas.height = SCREEN_HEIGHT; 
-    canvas.style.width  = `${SCREEN_WIDTH}px`;
-    canvas.style.height = `${SCREEN_HEIGHT}px`;
-
-    //Load shader source from local server
-    let vsSource = vertexShaderResponse.responseText;
-    let fsSource = fragmentShaderResponse.responseText;
-
-    //=====================================================
-    //STEP: Initialize the renderer
-    //=====================================================
-    const renderer = Renderer({
-        "canvas": canvas,
-        "shaderPrograms": [{
-            "name": "main",
-            "vertexShaders": [vsSource],
-            "franmentShaders": [fsSource]
-        }]
-    });
-
-    let { context: gl, shaderPrograms } = renderer;
-    let { main: shaderProgram } = shaderPrograms;
-    
+function setUpView(){
     //Setup MVP (Model View Project) Matrix
     let [halfWidth, halfHeight] = [ SCREEN_WIDTH/2, SCREEN_HEIGHT/2];
     let projMatrix = mat4.create();    
@@ -66,11 +50,64 @@ window.onload = async () => {
     let moveVec = vec3.fromValues(0, 0, 1);
     let scaleVec = vec3.fromValues(256, 256, 0);
     mat4.translate(modelMatrix, modelMatrix, moveVec);
+    mat4.rotate(modelMatrix, modelMatrix, theta, vec3.fromValues(0, 0, 1)); //NEW: rotate by theta angle on the Z axis
     mat4.scale(modelMatrix, modelMatrix, scaleVec);
+    theta = theta + 0.01; //NEW: increase the angle by a small amount.
 
     let mvpMatrix = mat4.create();
     mat4.multiply(mvpMatrix, modelMatrix, viewMatrix);
-    mat4.multiply(mvpMatrix, projMatrix, modelMatrix);    
+    mat4.multiply(mvpMatrix, projMatrix, modelMatrix); 
+
+    shaderProgram.setVariableMatrix4fv("u_mvpMatrix", mvpMatrix);
+}
+
+
+//=====================================================
+// STEP: Setup gameloop
+//=====================================================
+let game = AsyncTask({ scheduleFunc: requestAnimationFrame, cancelFunc: cancelAnimationFrame });
+game.callback((dt) => {
+    
+    //Recalculate the mvp matrix every frame.
+    setUpView();
+
+    //Render screen
+    renderer.render(({context:gl})=>{
+        gl.drawElements(gl.TRIANGLES, face_indices.length, gl.UNSIGNED_SHORT, face_indices);
+        gl.flush();
+    });    
+
+});
+
+
+window.onload = async () => {
+
+    await vertexShaderResponse;
+    await fragmentShaderResponse;
+
+    let canvas = document.getElementById('screen_canvas');
+    canvas.width  = SCREEN_WIDTH;
+    canvas.height = SCREEN_HEIGHT; 
+    canvas.style.width  = `${SCREEN_WIDTH}px`;
+    canvas.style.height = `${SCREEN_HEIGHT}px`;
+
+    let vsSource = vertexShaderResponse.responseText;
+    let fsSource = fragmentShaderResponse.responseText;
+
+    //=====================================================
+    //STEP: Initialize the renderer
+    //=====================================================
+    renderer = Renderer({
+        "canvas": canvas,
+        "shaderPrograms": [{
+            "name": "main",
+            "vertexShaders": [vsSource],
+            "franmentShaders": [fsSource]
+        }]
+    });
+
+    let { context: gl, shaderPrograms } = renderer;
+    shaderProgram = shaderPrograms.main;   
 
     //Create & bind buffer objects
     let vertex_buffer = renderer.createArrayBuffer(vert_coords);
@@ -79,11 +116,9 @@ window.onload = async () => {
 
     //Set shader variables
     shaderProgram.use();
-    shaderProgram.setVariableMatrix4fv("u_mvpMatrix", mvpMatrix);
     shaderProgram.setAttribute("a_position", vertex_buffer, 3, gl.FLOAT);
     shaderProgram.setAttribute("a_texCoord", texture_buffer, 2, gl.FLOAT, true); //NEW: pass texture coords onto shader
 
-    //NEW: load & bind texture object
     let image = null;
     let url = `${serverUrl}/images/brick1.jpg`;
     let promise = renderer.loadImage(url, (res) => image = res);
@@ -92,14 +127,9 @@ window.onload = async () => {
     texture.bind();
     shaderProgram.setVariable1i("u_image", texture.activeChannel);
 
-
-    //=====================================================
-    // STEP: Render Screen
-    //=====================================================
-    renderer.render(({gl:context})=>{
-        gl.drawElements(gl.TRIANGLES, face_indices.length, gl.UNSIGNED_SHORT, face_indices);
-        gl.flush();
-    });    
+    document.getElementById("btn_start").addEventListener("click", (evnt) => {
+        game.toggle();
+    });
 
 }
 </script>
@@ -107,5 +137,10 @@ window.onload = async () => {
 </head>
 <body>
     <canvas id="screen_canvas"></canvas>
+    
+    <div>  
+        <button name="start" id="btn_start">Start</button>
+      </div>
+
 </body>
 </html>

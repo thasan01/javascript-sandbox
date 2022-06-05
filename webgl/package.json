@@ -5,10 +5,11 @@
   "main": "renderer.js",
   "scripts": {
     "build": "browserify src/app.js -o build/app.js --standalone app",
-    "start-server": "run-script-os",
-    "start-server:win32": "bin\\start-server.bat",
-    "start-server:linux": "bin/start-server.sh",
-    "start-server:default": "echo 'This will run on any platform that does not have its own script'",
+    "server": "run-script-os",
+    "server:win32": "bin\\start-server.bat",
+    "server:linux": "bin/start-server.sh",
+    "server:default": "echo 'This will run on any platform that does not have its own script'",
+    "test": "nyc mocha 'test/**/*.js' --recursive",
     "scan": "sonar-scanner"
   },
   "author": "",
@@ -21,6 +22,7 @@
     "chai": "^4.3.4",
     "jsdoc": "^3.6.7",
     "nyc": "^15.1.0",
+    "read-file": "^0.2.0",
     "run-script-os": "^1.1.6"
   }
 }
