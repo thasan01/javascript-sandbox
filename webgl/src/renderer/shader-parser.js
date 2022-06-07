@@ -1,9 +1,8 @@
 exports.shaderParser = (source) => {
-  let ignorePattern = /^\s*\#/;
   let variablePattern =
     /^\s*(in|out|uniform)\s+(int|float|[bi]?vec\d+|[bi]?mat\d+|sampler2D)\s+([a-zA-Z0-9_]+(\[\d+\])?)/;
   let arrayPattern = /([a-zA-Z0-9_]+)\[(\d+)\]/;
-  let commentPattern = /^\s*\/\/.*/;
+  let commentPattern = /\s*;\s*(\/\/)\s*/;
 
   function processLine(line, meta) {
     let res = variablePattern.exec(line);
@@ -24,16 +23,14 @@ exports.shaderParser = (source) => {
   if (!source) throw new Error("Invalid input[source].");
 
   let meta = {};
-  let lines = source.split(";");
+  let lines = source.split("\n");
 
-  for (i in lines) {
-    let line = lines[i].trim();
-    let skip =
-      ignorePattern.exec(line) !== null || commentPattern.exec(line) !== null;
+  for (let i in lines) {
+    let line = lines[i];
 
-    if (skip) {
-      let array = line.split("\n");
-      line = array[1];
+    let idx = line.search(commentPattern);
+    if (idx > 0) {
+      line = line.substr(0, idx);
     }
 
     processLine(line, meta);

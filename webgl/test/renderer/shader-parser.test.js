@@ -33,6 +33,13 @@ describe("ShaderParser", function () {
         arraySize: null,
         location: null,
       },
+      u_mvpMatrix: {
+        arraySize: null,
+        dataType: "mat4",
+        isArray: false,
+        location: null,
+        qualifier: "uniform",
+      },
     };
 
     let actual = shaderParser(shaderSource);
