@@ -1,22 +1,50 @@
 exports.shaderParser = (source) => {
-  let variablePattern =
-    /^\s*(in|out|uniform)\s+(int|float|[bi]?vec\d+|[bi]?mat\d+|sampler2D)\s+([a-zA-Z0-9_]+(\[\d+\])?)/;
+  var invariantPattern = /(invariant\s+)?/;
+  var inputPattern = /(in\s+|out\s+|uniform\s+)/;
+  var dataypePattern =
+    /(int\s+|float\s+|[b|i]?vec\d+\s+|[b|i]?mat\d+\s+|sampler2D\s+)?/;
+  var precisionPattern = /(lowp\s+|mediump\s+|highp\s+)?/;
+  var variablePattern = /([a-zA-Z0-9_]+(\[\d+\])?)/;
   let arrayPattern = /([a-zA-Z0-9_]+)\[(\d+)\]/;
   let commentPattern = /\s*;\s*(\/\/)\s*/;
 
+  var regex = new RegExp(
+    "^s*" +
+      invariantPattern.source +
+      inputPattern.source +
+      precisionPattern.source +
+      dataypePattern.source +
+      variablePattern.source +
+      ".*"
+  );
+
   function processLine(line, meta) {
-    let res = variablePattern.exec(line);
+    let res = regex.exec(line);
     if (res != null) {
-      let [, qualifier, dataType, name] = res;
+      res = res.map((elem) => {
+        return typeof elem === "string" ? elem.trim() : elem;
+      });
 
-      arrayCheck = arrayPattern.exec(name);
-      let isArray = arrayCheck !== null;
+      let [, invariant, qualifier, precision, dataype, variableName, array] =
+        res;
 
-      let arraySize = null;
-      if (isArray) {
-        [, name, arraySize] = arrayCheck;
+      let isArray = array !== null;
+      let arraySize, arrayRes;
+
+      if (isArray && (arrayRes = arrayPattern.exec(variableName))) {
+        [, variableName, arraySize] = arrayRes;
       }
-      meta[name] = { qualifier, dataType, isArray, arraySize, location: null };
+
+      meta[variableName] = {
+        invariant,
+        qualifier,
+        dataype,
+        precision,
+        variableName,
+        isArray,
+        arraySize,
+        location: null,
+      };
     }
   }
 
